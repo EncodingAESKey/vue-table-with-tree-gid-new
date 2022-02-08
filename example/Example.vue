@@ -1,70 +1,83 @@
 <template lang="html">
   <!-- https://github.com/EncodingAESKey/vue-table-with-tree-grid -->
   <div id="example">
-    <div class="timeBar clear">
-      <div class="guiTitle">
-        <div class="apiTreeBox">name</div>
-        <div class="apiName">serviceName</div>
-      </div>
-      <div class="guiTable clear">
-        <li class="guiList" v-for="(item, index) in 10" :key="index">
-          <span>{{ index / 10 }} s</span>
-        </li>
-      </div>
-    </div>
-    <zk-table
-      ref="table"
-      sum-text="sum"
-      index-text="#"
-      :data="data"
-      :columns="columns"
-      :stripe="props.stripe"
-      :border="props.border"
-      :show-header="props.showHeader"
-      :show-summary="props.showSummary"
-      :show-row-hover="props.showRowHover"
-      :show-index="props.showIndex"
-      :tree-type="props.treeType"
-      :is-fold="props.isFold"
-      :expand-type="props.expandType"
-      :selection-type="props.selectionType"
-    >
-      <template slot="millisecond" slot-scope="scope">
-        <!-- 占位 做竖线 -->
-        <div class="templListBox">
-          <li :class="['templaLi']" v-for="(item, index) in 10" :key="index">
-            <span>&nbsp;</span>
-          </li>
-          <!-- 动态设置毫秒宽度 -->
-          <span
-            class="bgWidthColor"
-            :style="{
-              width: `${scope.row.duration ? scope.row.duration : 0}px`,
-              left: `${scope.row.startTime ? scope.row.startTime : 0}px`,
-              backgroundColor: `${fillColor[parseInt(Math.random() * 4)]}`,
-            }"
+    <div class="pageContent">
+      <div class="timeBar clear">
+        <div class="guiTitle">
+          <div class="apiTreeBox">name</div>
+          <div class="apiName">serviceName</div>
+        </div>
+        <div class="guiTable clear">
+          <li
+            class="guiList"
+            v-for="(item, index) in counts"
+            :key="'guit_' + index"
           >
-            <!-- 毫秒数在背景色上面 -->
-            <span
-              v-if="scope.row.duration && scope.row.duration > 200"
-              class="showMillisecond"
+            <span>{{ index / 10 }} s</span>
+          </li>
+        </div>
+      </div>
+      <zk-table
+        ref="table"
+        sum-text="sum"
+        index-text="#"
+        :data="data"
+        :style="{
+            tableLayout: 'fixed'
+        }"
+        :columns="columns"
+        :stripe="props.stripe"
+        :border="props.border"
+        :show-header="props.showHeader"
+        :show-summary="props.showSummary"
+        :show-row-hover="props.showRowHover"
+        :show-index="props.showIndex"
+        :tree-type="props.treeType"
+        :is-fold="props.isFold"
+        :expand-type="props.expandType"
+        :selection-type="props.selectionType"
+      >
+        <template slot="millisecond" slot-scope="scope">
+          <!-- 占位 做竖线 -->
+          <div class="templListBox">
+            <li
+              :class="['templaLi']"
+              v-for="(item, index) in counts"
+              :key="'temp_' + index"
             >
-              {{ scope.row.duration }} ms
-            </span>
-            <!-- 毫秒数在背景色后面 -->
+              <span>&nbsp;</span>
+            </li>
+            <!-- 动态设置毫秒宽度 -->
             <span
-              v-if="scope.row.duration && scope.row.duration <= 200"
-              class="showMilliAfter"
+              class="bgWidthColor"
               :style="{
-                left: `${scope.row.duration ? scope.row.duration + 5 : 0}px`,
+                width: `${scope.row.duration ? scope.row.duration - scope.row.startTime : 0}px`,
+                left: `${scope.row.startTime ? scope.row.startTime : 0}px`,
+                backgroundColor: `${fillColor[parseInt(Math.random() * 4)]}`,
               }"
             >
-              {{ scope.row.duration }} ms
+              <!-- 毫秒数在背景色上面 -->
+              <span
+                v-if="scope.row.duration && scope.row.duration - scope.row.startTime > 200"
+                class="showMillisecond"
+              >
+                {{ scope.row.duration }} ms
+              </span>
+              <!-- 毫秒数在背景色后面 -->
+              <span
+                v-if="scope.row.duration && scope.row.duration - scope.row.startTime <= 200"
+                class="showMilliAfter"
+                :style="{
+                  left: `${scope.row.duration ? scope.row.duration - scope.row.startTime + 5 : 0}px`,
+                }"
+              >
+                {{ scope.row.duration - scope.row.startTime }} ms
+              </span>
             </span>
-          </span>
-        </div>
-      </template>
-    </zk-table>
+          </div>
+        </template>
+      </zk-table>
+    </div>
   </div>
 </template>
 
@@ -79,6 +92,7 @@ export default {
   },
   data() {
     return {
+      counts: 10,
       props: {
         stripe: true, // 斑马色
         border: false,
@@ -129,9 +143,18 @@ export default {
   margin: 0;
   padding: 0;
 }
-
+#example {
+    // width: 3500px;
+}
+.pageContent {
+  width: 100%;
+  height: 100%;
+  background-color: #f8f9fb;
+  min-height: 300px;
+//   overflow-y: scroll;
+}
 .timeBar {
-  font-weight: 400;
+  display: flex;
   .guiTitle {
     width: 500px;
     height: 60px;
@@ -150,7 +173,7 @@ export default {
     display: inline-flex;
     height: 50px;
     line-height: 50px;
-    padding: 6px 12px;
+    padding: 0px 12px;
   }
 }
 .templListBox {
@@ -189,6 +212,7 @@ export default {
 .showMilliAfter {
   position: absolute;
   width: max-content;
+  z-index: 11111;
 }
 .guiList {
   width: 100px;
