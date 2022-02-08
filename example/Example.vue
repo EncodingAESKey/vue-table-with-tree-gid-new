@@ -82,13 +82,11 @@
 </template>
 
 <script>
-import ZkSwitch from "./Switch/Switch";
 import { dataList } from "./config.js";
 
 export default {
   name: "example",
   components: {
-    ZkSwitch,
   },
   data() {
     return {
