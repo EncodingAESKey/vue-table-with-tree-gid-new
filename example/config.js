@@ -35,14 +35,14 @@ export const dataList = [
         likes: ["football", "basketball"],
         score: 10,
         startTime: 0,
-        duration: 1200,
+        duration: 1900,
         children: [
             {
                 name: "tickets",
                 serviceName: "api",
                 likes: ["football", "basketball"],
                 score: 10,
-                startTime: 0,
+                startTime: 100,
                 duration: 200,
                 children: [
                     {

@@ -12,10 +12,21 @@
         >
           <li
             class="millList"
+            :style="{
+              width: `${millItemWidth}px`,
+            }"
             v-for="(item, index) in milliCounts"
             :key="'mill_list_' + index"
           >
-            <span>{{ index ? (index * threshold).toFixed(1) : 0 }} s</span>
+          <!-- index + 1 !== milliCounts: 隐藏最后一项秒数，做根节点最长秒数显示 -->
+            <span v-if="(index + 1 !== milliCounts)">{{ index ? (index * threshold).toFixed(1) : 0 }} s</span>
+            <span 
+                v-if="(index + 1 === milliCounts)"
+                :style="{
+                  position: 'absolute',
+                  left: `${getLastMillPosition()}px`,
+                }"
+            >{{ dataList[0].duration / 1000 }} s</span>
           </li>
         </div>
       </div>
@@ -23,7 +34,7 @@
         ref="table"
         sum-text="sum"
         index-text="#"
-        :data="data"
+        :data="dataList"
         :columns="columns"
         :stripe="config.stripe"
         :border="config.border"
@@ -41,6 +52,9 @@
           <div class="templListBox">
             <li
               :class="['splitLine']"
+              :style="{
+                width: `${millItemWidth - 1}px`, // -1是因为有1px的竖线border
+              }"
               v-for="(item, index) in milliCounts"
               :key="'split_line_' + index"
             >
@@ -82,30 +96,51 @@ export default {
   data() {
     return {
       milliCounts: 10, //需要循环的总毫秒次数
-      threshold: 0.2, // 毫秒数的循环阈值 (每次的步长)
-      config: zkTableConfig,
+      threshold: 0.2, //毫秒数的循环阈值 (每次的步长)
+      config: zkTableConfig, //table的配置文件
       fillColor: ["#a180c5", "#d28261", "#FF6A6A", "#6b9acf"],
       columns: columns,
-      data: dataList,
-      millClientWidth: 0,
+      dataList: dataList,
+      millClientWidth: 0, //毫秒数总宽度
+      millItemWidth:0, //每一块儿的宽度
     };
   },
   mounted() {
+    this.setThreshold();
     this.$nextTick(() => {
       this.onWindowBound();
     });
   },
   methods: {
+    // 根据根节点duration设置步长阈值
+    setThreshold() {
+      this.threshold = Math.round(dataList[0].duration / 1000) / 10;  //1000ms-0.1的步长  2000ms-0.2的步长  3000ms-0.3的步长
+    },
+    /**
+     * 1.获取容器宽度
+     * 2.根据根节点和步长做拆分
+     * 3.计算毫秒数需要循环的个数-最大毫秒就知道了
+     * 4.计算出每一块儿的宽度-做width和left计算
+     */
     onWindowBound() {
       let clientWidth = document.body.clientWidth;
       this.millClientWidth = clientWidth - this.$refs.apiNameRef.clientWidth; //毫秒容器的宽度
-      let mils = dataList[0].duration / this.millClientWidth;
-      console.log(232323, this.millClientWidth, dataList[0].duration);
+      let split = (dataList[0].duration / this.threshold); //根据步长this.threshold做拆分
+      let splitCount = Math.floor(split / 1000) + 1; //  计算出需要分割几块，1000目的是对应上面的秒数; 拓展：+n 可以多出来一个预留宽度
+      this.milliCounts = splitCount; // 需要循环的块数
+      this.millItemWidth = this.millClientWidth / splitCount; // 计算每一块儿的宽度
+      console.log("拆分数量:", splitCount, "每一块宽度:", this.millItemWidth, this.millClientWidth);
     },
     // 格式化开始时间
     formatStartTime(scope) {
       let startTime = scope.row.startTime;
-      return startTime ? startTime / (this.threshold * 10) : 0; // 开始时间设置为阈值对应1/2的位置
+      return startTime ? ((startTime / this.threshold) / 1000) * this.millItemWidth : 0; // 开始时间设置为阈值对应1/2的位置
+    },
+    // 获取最后一个秒数的位置
+    getLastMillPosition() {
+      let lastLeft = this.millClientWidth - (((dataList[0].duration / this.threshold) / 1000) * this.millItemWidth);
+      if (lastLeft.toFixed(2) == this.millItemWidth) return 0;
+      return lastLeft.toFixed(2);
     },
     /**
      * 计算步长维持的时间
@@ -114,10 +149,10 @@ export default {
      * @extends 拓展的宽度
      * @returns Number 维持的总时长
      */
-    getDurationBound(scope, extend = 0) {
+    getDurationBound(scope, extend = 0) {  
       let duration = scope.row.duration;
       let startTime = scope.row.startTime;
-      let bound = (duration - startTime) / (this.threshold * 10); // 宽度设置为阈值对应1/2的宽度
+      let bound = (((duration - startTime) / this.threshold) / 1000) * this.millItemWidth;  // 宽度设置为阈值对应1/2的宽度
       if (typeof bound === "number") {
         let newBound = this.handleDecimalPoint(bound);
         return newBound + extend;
@@ -172,6 +207,7 @@ export default {
     display: -webkit-inline-box;
     height: 50px;
     line-height: 50px;
+    position: relative;
     // overflow: hidden;
   }
 }
@@ -209,6 +245,7 @@ export default {
   padding: 0 5px;
   background-color: rgba(255, 255, 255, 0.9);
   border-radius: 3px;
+  z-index: 1000;
 }
 .showMillisecond {
   min-width: 30px;
