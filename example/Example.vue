@@ -1,19 +1,21 @@
 <template lang="html">
-  <!-- https://github.com/EncodingAESKey/vue-table-with-tree-grid -->
   <div id="example">
     <div class="pageContent">
-      <div class="timeBar clear">
-        <div class="guiTitle">
+      <div class="tableHeaderBar clear">
+        <div class="apiNameWrapper" ref="apiNameRef">
           <div class="apiTreeBox">name</div>
           <div class="apiName">serviceName</div>
         </div>
-        <div class="guiTable clear">
+        <div
+          class="headerMillWraper clear"
+          :style="{ width: `${millClientWidth}px` }"
+        >
           <li
-            class="guiList"
-            v-for="(item, index) in counts"
-            :key="'guit_' + index"
+            class="millList"
+            v-for="(item, index) in milliCounts"
+            :key="'mill_list_' + index"
           >
-            <span>{{ index / 10 }} s</span>
+            <span>{{ index ? (index * threshold).toFixed(1) : 0 }} s</span>
           </li>
         </div>
       </div>
@@ -22,28 +24,25 @@
         sum-text="sum"
         index-text="#"
         :data="data"
-        :style="{
-            tableLayout: 'fixed'
-        }"
         :columns="columns"
-        :stripe="props.stripe"
-        :border="props.border"
-        :show-header="props.showHeader"
-        :show-summary="props.showSummary"
-        :show-row-hover="props.showRowHover"
-        :show-index="props.showIndex"
-        :tree-type="props.treeType"
-        :is-fold="props.isFold"
-        :expand-type="props.expandType"
-        :selection-type="props.selectionType"
+        :stripe="config.stripe"
+        :border="config.border"
+        :show-header="config.showHeader"
+        :show-summary="config.showSummary"
+        :show-row-hover="config.showRowHover"
+        :show-index="config.showIndex"
+        :tree-type="config.treeType"
+        :is-fold="config.isFold"
+        :expand-type="config.expandType"
+        :selection-type="config.selectionType"
       >
         <template slot="millisecond" slot-scope="scope">
           <!-- 占位 做竖线 -->
           <div class="templListBox">
             <li
-              :class="['templaLi']"
-              v-for="(item, index) in counts"
-              :key="'temp_' + index"
+              :class="['splitLine']"
+              v-for="(item, index) in milliCounts"
+              :key="'split_line_' + index"
             >
               <span>&nbsp;</span>
             </li>
@@ -51,27 +50,20 @@
             <span
               class="bgWidthColor"
               :style="{
-                width: `${scope.row.duration ? scope.row.duration - scope.row.startTime : 0}px`,
-                left: `${scope.row.startTime ? scope.row.startTime : 0}px`,
+                width: `${getDurationBound(scope)}px`,
+                left: `${formatStartTime(scope)}px`,
                 backgroundColor: `${fillColor[parseInt(Math.random() * 4)]}`,
               }"
             >
-              <!-- 毫秒数在背景色上面 -->
+              <!-- getDurationBound(scope) >= 200  ->  毫秒数在背景色上面  left:10px -->
+              <!-- getDurationBound(scope) < 200  ->  毫秒数在背景色后面  计算left 距离左边距 +5px -->
               <span
-                v-if="scope.row.duration && scope.row.duration - scope.row.startTime > 200"
-                class="showMillisecond"
-              >
-                {{ scope.row.duration }} ms
-              </span>
-              <!-- 毫秒数在背景色后面 -->
-              <span
-                v-if="scope.row.duration && scope.row.duration - scope.row.startTime <= 200"
-                class="showMilliAfter"
+                :class="[getDurationBound(scope) >= 200 ? 'showMillisecond' : 'showMilliAfter']"
                 :style="{
-                  left: `${scope.row.duration ? scope.row.duration - scope.row.startTime + 5 : 0}px`,
+                  left: `${getDurationBound(scope) >= 200 ? 10 : getDurationBound(scope, 5)}px`,
                 }"
               >
-                {{ scope.row.duration - scope.row.startTime }} ms
+                {{ getMillSpecificData(scope) }}ms
               </span>
             </span>
           </div>
@@ -82,103 +74,112 @@
 </template>
 
 <script>
-import { dataList } from "./config.js";
+import { dataList, columns, zkTableConfig } from "./config.js";
 
 export default {
-  name: "example",
-  components: {
-  },
+  name: "table-tree-grid",
+  components: {},
   data() {
     return {
-      counts: 10,
-      props: {
-        stripe: true, // 斑马色
-        border: false,
-        showHeader: false, // 是否展示头部header
-        showSummary: false,
-        showRowHover: true,
-        showIndex: false,
-        treeType: true,
-        isFold: true,
-        expandType: false,
-        selectionType: false,
-      },
+      milliCounts: 10, //需要循环的总毫秒次数
+      threshold: 0.2, // 毫秒数的循环阈值 (每次的步长)
+      config: zkTableConfig,
       fillColor: ["#a180c5", "#d28261", "#FF6A6A", "#6b9acf"],
-      columns: [
-        {
-          label: "name",
-          prop: "name",
-          width: "300px",
-        },
-        {
-          label: "serviceName",
-          prop: "serviceName",
-          width: "200px",
-        },
-        {
-          label: "millisecond",
-          prop: "millisecond",
-          type: "template",
-          template: "millisecond",
-        },
-      ],
+      columns: columns,
       data: dataList,
+      millClientWidth: 0,
     };
   },
-  computed: {
-    propList() {
-      return Object.keys(this.props).map((item) => ({
-        name: item,
-      }));
+  mounted() {
+    this.$nextTick(() => {
+      this.onWindowBound();
+    });
+  },
+  methods: {
+    onWindowBound() {
+      let clientWidth = document.body.clientWidth;
+      this.millClientWidth = clientWidth - this.$refs.apiNameRef.clientWidth; //毫秒容器的宽度
+      let mils = dataList[0].duration / this.millClientWidth;
+      console.log(232323, this.millClientWidth, dataList[0].duration);
+    },
+    // 格式化开始时间
+    formatStartTime(scope) {
+      let startTime = scope.row.startTime;
+      return startTime ? startTime / (this.threshold * 10) : 0; // 开始时间设置为阈值对应1/2的位置
+    },
+    /**
+     * 计算步长维持的时间
+     * @param duration 步长
+     * @param startTime 开始时间
+     * @extends 拓展的宽度
+     * @returns Number 维持的总时长
+     */
+    getDurationBound(scope, extend = 0) {
+      let duration = scope.row.duration;
+      let startTime = scope.row.startTime;
+      let bound = (duration - startTime) / (this.threshold * 10); // 宽度设置为阈值对应1/2的宽度
+      if (typeof bound === "number") {
+        let newBound = this.handleDecimalPoint(bound);
+        return newBound + extend;
+      } else {
+        console.error("非数值类型！-> duration:", duration, "startTime:", startTime, "bound:", bound);
+        return 0;
+      }
+    },
+    // 展示毫秒数具体数值
+    getMillSpecificData(scope) {
+      let bound = scope.row.duration - scope.row.startTime;
+      return this.handleDecimalPoint(bound);
+    },
+    // 处理整数与小数的情况
+    handleDecimalPoint(bound) {
+      var x = String(bound).indexOf(".") + 1; // 小数点的位置
+      var y = String(bound).length - x; // 小数的位数
+      if (x == 0) return bound; // 整数
+      if (y >= 3) return bound.toFixed(2); // 小数超过3个做保留2位小数处理
+      return bound; // 小与3位的小数正常显示
     },
   },
-  methods: {},
 };
 </script>
 
 <style scoped lang="less">
-* {
-  margin: 0;
-  padding: 0;
-}
-#example {
-    // width: 3500px;
-}
 .pageContent {
   width: 100%;
   height: 100%;
-  background-color: #f8f9fb;
+  //   background-color: #f8f9fb;
   min-height: 300px;
-//   overflow-y: scroll;
 }
-.timeBar {
+.tableHeaderBar {
   display: flex;
-  .guiTitle {
+  font-size: 14px;
+  .apiNameWrapper {
     width: 500px;
-    height: 60px;
-    line-height: 60px;
+    height: 50px;
+    line-height: 50px;
     text-align: left;
-    float: left;
     display: flex;
     .apiTreeBox {
       width: 300px;
+      padding-left: 12px;
     }
     .apiName {
       width: 200px;
+      padding-left: 12px;
     }
   }
-  .guiTable {
-    display: inline-flex;
+  .headerMillWraper {
+    display: -webkit-inline-box;
     height: 50px;
     line-height: 50px;
-    padding: 0px 12px;
+    // overflow: hidden;
   }
 }
 .templListBox {
   display: inline-flex;
   align-items: center;
   position: relative;
-  .templaLi {
+  .splitLine {
     width: 99px;
     height: 100%;
     position: relative;
@@ -186,11 +187,17 @@ export default {
     border-left: 1px solid #f8f9fb;
   }
 }
+.millList {
+  width: 100px;
+  position: relative;
+  //   border-bottom: solid 1px #e5e7f1;
+  z-index: 666;
+}
 .bgWidthColor {
   position: absolute;
   display: flex;
   align-items: center;
-  height: 60%;
+  height: 100%;
   background-color: #a180c5;
 }
 .showMillisecond,
@@ -205,18 +212,11 @@ export default {
 }
 .showMillisecond {
   min-width: 30px;
-  left: 10px;
 }
 .showMilliAfter {
   position: absolute;
   width: max-content;
   z-index: 11111;
-}
-.guiList {
-  width: 100px;
-  position: relative;
-  //   border-bottom: solid 1px #e5e7f1;
-  z-index: 666;
 }
 .switch-list {
   margin: 20px 0;
