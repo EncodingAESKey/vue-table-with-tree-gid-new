@@ -149,10 +149,17 @@ export default {
      * @extends 拓展的宽度
      * @returns Number 维持的总时长
      */
+    /**
+     * 注解： let bound = (((duration - startTime) / this.threshold) / 1000) * this.millItemWidth;
+     * (duration - startTime) - 为时间间距
+     * (duration - startTime) / this.threshold  - 为每一块儿对应的毫秒数
+     * ((duration - startTime) / this.threshold) / 1000)  - 为每一块儿对应的秒数
+     * (((duration - startTime) / this.threshold) / 1000) * this.millItemWidth  - 乘以每一块儿的宽度获取到当前毫秒数占用的总宽度 bound
+     */
     getDurationBound(scope, extend = 0) {  
       let duration = scope.row.duration;
       let startTime = scope.row.startTime;
-      let bound = (((duration - startTime) / this.threshold) / 1000) * this.millItemWidth;  // 宽度设置为阈值对应1/2的宽度
+      let bound = (((duration - startTime) / this.threshold) / 1000) * this.millItemWidth;
       if (typeof bound === "number") {
         let newBound = this.handleDecimalPoint(bound);
         return newBound + extend;
