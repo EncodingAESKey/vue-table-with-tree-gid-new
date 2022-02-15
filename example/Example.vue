@@ -20,15 +20,17 @@
             v-for="(item, index) in milliCounts"
             :key="'mill_list_' + index"
           >
-          <!-- index + 1 !== milliCounts: 隐藏最后一项秒数，做根节点最长秒数显示 -->
+          <!-- index + 1 !== milliCounts: 隐藏最后一项秒数，做根节点最长秒数显示  减24解释：-12px和对齐中间位置给了12px-->
+            <span v-if="(milliCounts === 1)">0 s</span>
             <span v-if="(index + 1 !== milliCounts)">{{ index ? (index * threshold).toFixed(1) : 0 }} s</span>
             <span 
                 v-if="(index + 1 === milliCounts)"
                 :style="{
                   position: 'absolute',
-                  left: `${getLastMillPosition()}px`,
+                  right: `${(getLastMillPosition())}px`,
+                  width: 'fit-content'
                 }"
-            >{{ handleDecimalPoint(dataList[0].duration / 1000) }} s</span>
+            >{{ handleDecimalPoint(dataList[0].duration / 1000, true) }} s</span>
           </li>
         </div>
       </div>
@@ -153,7 +155,6 @@ export default {
       traceData[0].spans.forEach((element) => {
         if (element.spanID !== root[0].spanID) element['startTime'] = (element['startTime'] - root[0]['startTime']) / 1000; // 转换成毫秒 跟节点既开始时间，微秒数最小
         element['duration'] = element['duration'] / 1000;
-        console.log("element", element['startTime']);
       })
       root[0].startTime = 0;
       return traceData;
@@ -180,6 +181,7 @@ export default {
     // 根据根节点duration设置步长阈值
     setThreshold() {
       this.threshold = Math.round(this.dataList[0].duration / 1000) / 10;  //1000ms-0.1的步长  2000ms-0.2的步长  3000ms-0.3的步长
+      if (this.threshold <= 0) this.threshold = 0.1;
     },
     /**
      * 1.获取容器宽度
@@ -199,14 +201,23 @@ export default {
     },
     // 格式化开始时间
     setStartTimeLeftSpace(scope) {
+      if (!this.millItemWidth) return;
       let startTime = scope.row.startTime;
       return startTime ? ((startTime / this.threshold) / 1000) * this.millItemWidth : 0; // 开始时间设置为阈值对应1/2的位置
     },
     // 计算最后一个秒数的位置
     getLastMillPosition() {
+      if (!this.millItemWidth) return;
+      let spaceMiddle = 24; //微调对齐细节
       let lastLeft = this.millClientWidth - (((this.dataList[0].duration / this.threshold) / 1000) * this.millItemWidth);
-      if (lastLeft.toFixed(2) == this.millItemWidth) return 0;
-      return lastLeft.toFixed(2);
+      // if (this.milliCounts === 1) spaceMiddle = 36;  // 0.0几 秒的情况偏移36
+      // 小于20说明最后一个秒数顶到头了，向左偏移固定px即可(处理样式问题)
+      if (lastLeft.toFixed(2) == this.millItemWidth) {
+        let reduce = this.millItemWidth - spaceMiddle;
+        return reduce < 20 ? -12 : reduce;
+      }
+      let reduceLast = Number(lastLeft.toFixed(2)) - spaceMiddle;
+      return reduceLast < 20 ? -12 : reduceLast;
     },
     /**
      * 计算步长维持的时间
@@ -222,10 +233,12 @@ export default {
      * ((duration - startTime) / this.threshold) / 1000)  - 为每一块儿对应的秒数
      * (((duration - startTime) / this.threshold) / 1000) * this.millItemWidth  - 乘以每一块儿的宽度获取到当前毫秒数占用的总宽度 bound
      */
-    getDurationBound(scope, extend = 0) {  
+    getDurationBound(scope, extend = 0) {
+      if (!this.millItemWidth) return;
       let duration = scope.row.duration;
       let startTime = scope.row.startTime;
       let bound = (((duration - startTime) / this.threshold) / 1000) * this.millItemWidth;
+      // let bound = Math.abs(((startTime - duration) / this.threshold) / 1000) * this.millItemWidth;
       if (typeof bound === "number") {
         let newBound = this.handleDecimalPoint(bound);
         return newBound + extend;
@@ -236,15 +249,19 @@ export default {
     },
     // 展示毫秒数具体数值
     getMillSpecificData(scope) {
+      // let bound = Math.abs(scope.row.startTime - scope.row.duration);
       let bound = scope.row.duration - scope.row.startTime;
       return this.handleDecimalPoint(bound);
     },
-    // 处理整数与小数的情况
-    handleDecimalPoint(bound) {
+    /**
+     * 处理整数与小数的情况
+     * retain: 根节点最长秒数显示做3-5位特殊限制
+     */
+    handleDecimalPoint(bound, retain = false) {
       var x = String(bound).indexOf(".") + 1; // 小数点的位置
       var y = String(bound).length - x; // 小数的位数
       if (x == 0) return bound; // 整数
-      if (y >= 3) return bound.toFixed(2); // 小数超过3个做保留2位小数处理
+      if (y >= 3) return retain ? bound.toFixed(y > 5 ? 5 : y) : bound.toFixed(2); // 小数超过3个做保留2位小数处理
       return bound; // 小与3位的小数正常显示
     },
   },
