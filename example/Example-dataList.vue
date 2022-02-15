@@ -3,9 +3,7 @@
     <div class="pageContent">
       <div class="tableHeaderBar clear">
         <div class="apiNameWrapper" ref="apiNameRef">
-          <div class="apiTreeBox" :style="{
-              width: `${nameWidth}px`,
-            }">name</div>
+          <div class="apiTreeBox">name</div>
           <div class="apiName">serviceName</div>
         </div>
         <div
@@ -28,7 +26,7 @@
                   position: 'absolute',
                   left: `${getLastMillPosition()}px`,
                 }"
-            >{{ handleDecimalPoint(dataList[0].duration / 1000) }} s</span>
+            >{{ dataList[0].duration / 1000 }} s</span>
           </li>
         </div>
       </div>
@@ -67,8 +65,8 @@
               class="bgWidthColor"
               :style="{
                 width: `${getDurationBound(scope)}px`,
-                left: `${setStartTimeLeftSpace(scope)}px`,
-                backgroundColor: `${scope.row.bgColor}`,
+                left: `${formatStartTime(scope)}px`,
+                backgroundColor: `${fillColor[parseInt(Math.random() * 4)]}`,
               }"
             >
               <!-- getDurationBound(scope) >= 200  ->  毫秒数在背景色上面  left:10px -->
@@ -91,7 +89,6 @@
 
 <script>
 import { dataList, columns, zkTableConfig } from "./config.js";
-import { dataListTrace } from "./trace.js";
 
 export default {
   name: "table-tree-grid",
@@ -99,87 +96,25 @@ export default {
   data() {
     return {
       milliCounts: 10, //需要循环的总毫秒次数
-      nameWidth: 300, // name列默认宽度
       threshold: 0.2, //毫秒数的循环阈值 (每次的步长)
       config: zkTableConfig, //table的配置文件
       fillColor: ["#a180c5", "#d28261", "#FF6A6A", "#6b9acf"],
       columns: columns,
       millClientWidth: 0, //毫秒数总宽度
       millItemWidth:0, //每一块儿的宽度
-      dataList: dataList, //默认给一个，为了动态计算宽度
-      sourceTraceData: [], //源数据
-      targetTraceData: [] //目标数据
+      dataList: dataList,
     };
   },
   mounted() {
-    this.handleServiceData(dataListTrace.data); //解析数据
+    this.setThreshold();
     this.$nextTick(() => {
-      /************ start 动态计算name宽度 ***********/
-      // let element = document.getElementsByClassName('zk-table__body-row')[0];
-      // if (element) this.nameWidth = element[element.firstElementChild ? 'firstElementChild' : 'firstChild'].clientWidth || 0;  // 动态设置name列的宽度
-      /************ end 动态计算name宽度 ***********/
-      this.setThreshold();
       this.onWindowBound();
     });
   },
   methods: {
-    /**
-     * 解析 trace data 数据结构
-     */
-    handleServiceData(traceData) {
-      let formatRes = this.formatStartTimeAndDuration(traceData); // 格式化
-      console.log("格式化时间结果", formatRes);
-      this.sourceTraceData = formatRes;
-      this.targetTraceData = JSON.parse(JSON.stringify(formatRes));
-      // 规整processes的数据,重组spans
-      this.targetTraceData.forEach((element, elementIndex) => {
-        element.spans.forEach((spansItem, spansIndex) => {
-          spansItem["name"] = spansItem["operationName"];
-          spansItem["serviceName"] = element.processes[spansItem.processID].serviceName; //赋值processes的serviceName
-          spansItem["processObject"] = element.processes[spansItem.processID]; //赋值processes的serviceName
-          spansItem["bgColor"] = this.fillColor[parseInt(Math.random() * 4)]; //动态设置背景色
-        });
-      });
-      this.targetTraceData[0].spans = this.handleTraceTree(this.targetTraceData[0].spans);// 组装树结构
-      this.dataList = this.targetTraceData[0].spans;
-      console.log("树组装结果", this.targetTraceData, this.dataList);
-    },
-    /**
-     * startTime + duration 日期时间格式转换
-     * 处理startTime数据 转换成起始点从0开始的逻辑 startTime从微秒转换为毫秒开始时间点 duration 从微秒转换成毫秒即可
-     */
-    formatStartTimeAndDuration(traceData) {
-      let root = traceData[0].spans.filter((r) => (r.references && Array.isArray(r.references) && !r.references.length));
-      traceData[0].spans.forEach((element) => {
-        if (element.spanID !== root[0].spanID) element['startTime'] = (element['startTime'] - root[0]['startTime']) / 1000; // 转换成毫秒 跟节点既开始时间，微秒数最小
-        element['duration'] = element['duration'] / 1000;
-        console.log("element", element['startTime']);
-      })
-      root[0].startTime = 0;
-      return traceData;
-    },
-    /**
-     * 实现方法思路：组装完之后 层级之间会存在多层嵌套的结果
-     * 通过item的spanId去找references里面对应的spanId，就是子集
-     * references中的spanID 对应  span中的spanID 
-     * 剩下的就看这个不为空的spanID对应的那个item的spanID  对应哪个就是哪个的子集
-     */
-    handleTraceTree(spansNodeList) {
-      let spansList = spansNodeList;
-      let parentList = spansList.filter((r) => (r.references && Array.isArray(r.references) && !r.references.length)); // 过滤出跟节点
-      let childList = spansList.filter((r) => (r.references && Array.isArray(r.references) && r.references.length)); // 过滤出除跟节点以外的其他节点
-      childList.filter((father) => {
-        let branchArr = childList.filter((child) => {
-          return father['spanID'] === child['references'][0]['spanID'];
-        });
-        father['children'] = branchArr;
-      })
-      parentList[0]['children'] = childList;
-      return parentList;
-    },
     // 根据根节点duration设置步长阈值
     setThreshold() {
-      this.threshold = Math.round(this.dataList[0].duration / 1000) / 10;  //1000ms-0.1的步长  2000ms-0.2的步长  3000ms-0.3的步长
+      this.threshold = Math.round(dataList[0].duration / 1000) / 10;  //1000ms-0.1的步长  2000ms-0.2的步长  3000ms-0.3的步长
     },
     /**
      * 1.获取容器宽度
@@ -189,22 +124,33 @@ export default {
      */
     onWindowBound() {
       let clientWidth = document.body.clientWidth;
-      // this.millClientWidth = clientWidth - this.$refs.apiNameRef.clientWidth; //毫秒容器的宽度（name列固定300用这个方法）
-      this.millClientWidth = clientWidth - (this.nameWidth + 200); //毫秒容器的宽度（name列如果是动态计算的话用这个方法 ）
-      let split = (this.dataList[0].duration / this.threshold); //根据步长this.threshold做拆分
+      this.millClientWidth = clientWidth - this.$refs.apiNameRef.clientWidth; //毫秒容器的宽度
+      let split = (dataList[0].duration / this.threshold); //根据步长this.threshold做拆分
       let splitCount = Math.floor(split / 1000) + 1; //  计算出需要分割几块，1000目的是对应上面的秒数; 拓展：+n 可以多出来一个预留宽度
       this.milliCounts = splitCount; // 需要循环的块数
       this.millItemWidth = this.millClientWidth / splitCount; // 计算每一块儿的宽度
       console.log("拆分数量:", splitCount, "每一块宽度:", this.millItemWidth, this.millClientWidth);
     },
     // 格式化开始时间
-    setStartTimeLeftSpace(scope) {
+    formatStartTime(scope) {
       let startTime = scope.row.startTime;
       return startTime ? ((startTime / this.threshold) / 1000) * this.millItemWidth : 0; // 开始时间设置为阈值对应1/2的位置
     },
-    // 计算最后一个秒数的位置
+    // 格式化时间点 "2019-04-30 12:32:03"
+    formatDate (timeStamp) {
+        function add0 (m) {return m < 10 ? '0' + m : m};
+        var time = new Date (timeStamp);
+        var yea = time.getFullYear ();
+        var mon = time.getMonth () + 1;
+        var day = time.getDate ();
+        var hour = time.getHours ();
+        var min = time.getMinutes ();
+        var sec = time.getSeconds ();
+        return yea + '-' + add0 (mon) + '-' + add0 (day) + " " + hour + '-' + min + '-' + add0(sec);
+    },
+    // 获取最后一个秒数的位置
     getLastMillPosition() {
-      let lastLeft = this.millClientWidth - (((this.dataList[0].duration / this.threshold) / 1000) * this.millItemWidth);
+      let lastLeft = this.millClientWidth - (((dataList[0].duration / this.threshold) / 1000) * this.millItemWidth);
       if (lastLeft.toFixed(2) == this.millItemWidth) return 0;
       return lastLeft.toFixed(2);
     },
@@ -262,7 +208,7 @@ export default {
   display: flex;
   font-size: 14px;
   .apiNameWrapper {
-    // min-width: 500px;
+    width: 500px;
     height: 50px;
     line-height: 50px;
     text-align: left;
@@ -272,9 +218,8 @@ export default {
       padding-left: 12px;
     }
     .apiName {
-      width: 188px;
-      // padding-left: 12px;
-      // margin-left: -12px;
+      width: 200px;
+      padding-left: 12px;
     }
   }
   .headerMillWraper {
@@ -282,7 +227,6 @@ export default {
     height: 50px;
     line-height: 50px;
     position: relative;
-    left: -12px;
     // overflow: hidden;
   }
 }
