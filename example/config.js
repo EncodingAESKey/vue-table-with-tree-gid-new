@@ -18,8 +18,8 @@ export const zkTableConfig = {
  */
 export const columns = [
   {
-    label: "name",
-    prop: "name",
+    label: "operationName",
+    prop: "operationName",
     // width: "300px",
     width: "300px",
   },

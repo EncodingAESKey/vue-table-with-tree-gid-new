@@ -30,7 +30,7 @@
                   right: `${(getLastMillPosition())}px`,
                   width: 'fit-content'
                 }"
-            >{{ dataList.length ? handleDecimalPoint(dataList[0].duration / 1000, true) : 0 }} s</span>
+            >{{ handleDecimalPoint(dataList[0].duration / 1000, true) }} s</span>
           </li>
         </div>
       </div>
@@ -100,7 +100,7 @@ export default {
   components: {},
   data() {
     return {
-      milliCounts: 0, //需要循环的总毫秒次数
+      milliCounts: 10, //需要循环的总毫秒次数
       nameWidth: 300, // name列默认宽度
       threshold: 0.2, //毫秒数的循环阈值 (每次的步长)
       config: zkTableConfig, //table的配置文件
@@ -108,13 +108,13 @@ export default {
       columns: columns,
       millClientWidth: 0, //毫秒数总宽度
       millItemWidth:0, //每一块儿的宽度
-      dataList: [], //默认给一个，为了动态计算宽度
+      dataList: dataList, //默认给一个，为了动态计算宽度
       sourceTraceData: [], //源数据
       targetTraceData: [] //目标数据
     };
   },
   mounted() {
-    this.handleServiceData(dataListTrace.data.spanDTO); //解析数据
+    this.handleServiceData(dataListTrace.data); //解析数据
     this.$nextTick(() => {
       /************ start 动态计算name宽度 ***********/
       // let element = document.getElementsByClassName('zk-table__body-row')[0];
@@ -129,23 +129,57 @@ export default {
      * 解析 trace data 数据结构
      */
     handleServiceData(traceData) {
-      let formatRes = this.formatDeptsData([traceData]);
-      this.dataList = formatRes;
-    },
-    formatDeptsData(traceData) {
-      return (traceData || []).map((element) => {
-        const { ...others } = element;
-        return {
-          ...others,
-          startTime: ((element['startTime'] - traceData[0].startTime) / 1000), // 转换成毫秒 跟节点既开始时间，微秒数最小
-          duration: (element['duration'] / 1000),
-          children: element.children && element.children.length ? this.formatDeptsData(element.children) : null,
-        };
+      let formatRes = this.formatStartTimeAndDuration(traceData); // 格式化
+      console.log("格式化时间结果", formatRes);
+      this.sourceTraceData = formatRes;
+      this.targetTraceData = JSON.parse(JSON.stringify(formatRes));
+      // 规整processes的数据,重组spans
+      this.targetTraceData.forEach((element, elementIndex) => {
+        element.spans.forEach((spansItem, spansIndex) => {
+          spansItem["name"] = spansItem["operationName"];
+          spansItem["serviceName"] = element.processes[spansItem.processID].serviceName; //赋值processes的serviceName
+          spansItem["processObject"] = element.processes[spansItem.processID]; //赋值processes的serviceName
+          spansItem["bgColor"] = this.fillColor[parseInt(Math.random() * 4)]; //动态设置背景色
+        });
       });
+      this.targetTraceData[0].spans = this.handleTraceTree(this.targetTraceData[0].spans);// 组装树结构
+      this.dataList = this.targetTraceData[0].spans;
+      console.log("树组装结果", this.targetTraceData, this.dataList);
+    },
+    /**
+     * startTime + duration 日期时间格式转换
+     * 处理startTime数据 转换成起始点从0开始的逻辑 startTime从微秒转换为毫秒开始时间点 duration 从微秒转换成毫秒即可
+     */
+    formatStartTimeAndDuration(traceData) {
+      let root = traceData[0].spans.filter((r) => (r.references && Array.isArray(r.references) && !r.references.length));
+      traceData[0].spans.forEach((element) => {
+        if (element.spanID !== root[0].spanID) element['startTime'] = (element['startTime'] - root[0]['startTime']) / 1000; // 转换成毫秒 跟节点既开始时间，微秒数最小
+        element['duration'] = element['duration'] / 1000;
+      })
+      root[0].startTime = 0;
+      return traceData;
+    },
+    /**
+     * 实现方法思路：组装完之后 层级之间会存在多层嵌套的结果
+     * 通过item的spanId去找references里面对应的spanId，就是子集
+     * references中的spanID 对应  span中的spanID 
+     * 剩下的就看这个不为空的spanID对应的那个item的spanID  对应哪个就是哪个的子集
+     */
+    handleTraceTree(spansNodeList) {
+      let spansList = spansNodeList;
+      let parentList = spansList.filter((r) => (r.references && Array.isArray(r.references) && !r.references.length)); // 过滤出跟节点
+      let childList = spansList.filter((r) => (r.references && Array.isArray(r.references) && r.references.length)); // 过滤出除跟节点以外的其他节点
+      childList.filter((father) => {
+        let branchArr = childList.filter((child) => {
+          return father['spanID'] === child['references'][0]['spanID'];
+        });
+        father['children'] = branchArr;
+      })
+      parentList[0]['children'] = childList;
+      return parentList;
     },
     // 根据根节点duration设置步长阈值
     setThreshold() {
-      if (!this.dataList.length) return; 
       this.threshold = Math.round(this.dataList[0].duration / 1000) / 10;  //1000ms-0.1的步长  2000ms-0.2的步长  3000ms-0.3的步长
       if (this.threshold <= 0) this.threshold = 0.1;
     },
@@ -156,7 +190,6 @@ export default {
      * 4.计算出每一块儿的宽度-做width和left计算
      */
     onWindowBound() {
-      if (!this.dataList.length) return; 
       let clientWidth = document.body.clientWidth;
       // this.millClientWidth = clientWidth - this.$refs.apiNameRef.clientWidth; //毫秒容器的宽度（name列固定300用这个方法）
       this.millClientWidth = clientWidth - (this.nameWidth + 200); //毫秒容器的宽度（name列如果是动态计算的话用这个方法 ）
@@ -174,7 +207,7 @@ export default {
     },
     // 计算最后一个秒数的位置
     getLastMillPosition() {
-      if (!this.millItemWidth || !this.dataList.length) return;
+      if (!this.millItemWidth) return;
       let spaceMiddle = 24; //微调对齐细节
       let lastLeft = this.millClientWidth - (((this.dataList[0].duration / this.threshold) / 1000) * this.millItemWidth);
       // if (this.milliCounts === 1) spaceMiddle = 36;  // 0.0几 秒的情况偏移36
