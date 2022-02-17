@@ -92,7 +92,7 @@
 </template>
 
 <script>
-import { dataList, columns, zkTableConfig } from "./config.js";
+import { columns, zkTableConfig } from "./config.js";
 import { dataListTrace } from "./trace.js";
 
 export default {
@@ -104,17 +104,19 @@ export default {
       nameWidth: 300, // name列默认宽度
       threshold: 0.2, //毫秒数的循环阈值 (每次的步长)
       config: zkTableConfig, //table的配置文件
-      fillColor: ["#a180c5", "#d28261", "#FF6A6A", "#6b9acf"],
       columns: columns,
       millClientWidth: 0, //毫秒数总宽度
       millItemWidth:0, //每一块儿的宽度
       dataList: [], //默认给一个，为了动态计算宽度
       sourceTraceData: [], //源数据
-      targetTraceData: [] //目标数据
+      targetTraceData: [], //目标数据
+      fillColor: ["#a180c5", "#d28261", "#FF6A6A", "#6b9acf"],
+      allServiceNameList: [], //获取所有的 serviceName
+      assembleColor: {}, //组装颜色值
     };
   },
   mounted() {
-    this.handleServiceData(dataListTrace.data.spanDTO); //解析数据
+    this.handleServiceData(dataListTrace.data.spanDTO);
     this.$nextTick(() => {
       /************ start 动态计算name宽度 ***********/
       // let element = document.getElementsByClassName('zk-table__body-row')[0];
@@ -125,23 +127,33 @@ export default {
     });
   },
   methods: {
-    /**
-     * 解析 trace data 数据结构
-     */
-    handleServiceData(traceData) {
-      let formatRes = this.formatDeptsData([traceData]);
+    // 解析接口数据
+    handleServiceData(spanDTO) {
+      if (!spanDTO) return;
+      let formatRes = this.formatDeptsData([spanDTO]);
       this.dataList = formatRes;
     },
+    // 格式化tree数据及字段
     formatDeptsData(traceData) {
       return (traceData || []).map((element) => {
         const { ...others } = element;
+        this.setServicesNameBgColor(element);
         return {
           ...others,
           startTime: ((element['startTime'] - traceData[0].startTime) / 1000), // 转换成毫秒 跟节点既开始时间，微秒数最小
           duration: (element['duration'] / 1000),
           children: element.children && element.children.length ? this.formatDeptsData(element.children) : null,
+          bgColor: this.assembleColor[element.serviceName]
         };
       });
+    },
+    // 根据 serviceName 动态设置背景色
+    setServicesNameBgColor(element) {
+      this.allServiceNameList.push(element.serviceName);
+      this.allServiceNameList = Array.from(new Set(this.allServiceNameList));
+      for (var item in this.allServiceNameList){
+        this.assembleColor[this.allServiceNameList[item]] = this.fillColor[item];
+      };
     },
     // 根据根节点duration设置步长阈值
     setThreshold() {
@@ -189,35 +201,31 @@ export default {
     /**
      * 计算步长维持的时间
      * @param duration 步长
-     * @param startTime 开始时间
      * @extends 拓展的宽度
      * @returns Number 维持的总时长
      */
     /**
-     * 注解： let bound = (((duration - startTime) / this.threshold) / 1000) * this.millItemWidth;
-     * (duration - startTime) - 为时间间距
-     * (duration - startTime) / this.threshold  - 为每一块儿对应的毫秒数
-     * ((duration - startTime) / this.threshold) / 1000)  - 为每一块儿对应的秒数
-     * (((duration - startTime) / this.threshold) / 1000) * this.millItemWidth  - 乘以每一块儿的宽度获取到当前毫秒数占用的总宽度 bound
+     * 注解： let bound = (((duration) / this.threshold) / 1000) * this.millItemWidth;
+     * (duration) - 为时间间距
+     * (duration) / this.threshold  - 为每一块儿对应的毫秒数
+     * ((duration) / this.threshold) / 1000)  - 为每一块儿对应的秒数
+     * (((duration) / this.threshold) / 1000) * this.millItemWidth  - 乘以每一块儿的宽度获取到当前毫秒数占用的总宽度 bound
      */
     getDurationBound(scope, extend = 0) {
       if (!this.millItemWidth) return;
-      let duration = scope.row.duration;
-      let startTime = scope.row.startTime;
-      let bound = (((duration - startTime) / this.threshold) / 1000) * this.millItemWidth;
-      // let bound = Math.abs(((startTime - duration) / this.threshold) / 1000) * this.millItemWidth;
+      let bound = Math.abs(((scope.row.duration) / this.threshold) / 1000) * this.millItemWidth;
       if (typeof bound === "number") {
         let newBound = this.handleDecimalPoint(bound);
         return newBound + extend;
       } else {
-        console.error("非数值类型！-> duration:", duration, "startTime:", startTime, "bound:", bound);
+        console.error("非数值类型！->bound:", bound);
         return 0;
       }
     },
     // 展示毫秒数具体数值
     getMillSpecificData(scope) {
       // let bound = Math.abs(scope.row.startTime - scope.row.duration);
-      let bound = scope.row.duration - scope.row.startTime;
+      let bound = scope.row.duration;
       return this.handleDecimalPoint(bound);
     },
     /**
