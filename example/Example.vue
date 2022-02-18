@@ -179,7 +179,7 @@ export default {
       if (!this.dataList.length) return; 
       let clientWidth = document.body.clientWidth;
       // this.millClientWidth = clientWidth - this.$refs.apiNameRef.clientWidth; //毫秒容器的宽度（name列固定300用这个方法）
-      this.millClientWidth = clientWidth - (this.nameWidth + 210); //毫秒容器的宽度（name列如果是动态计算的话用这个方法 ）留出10px的多余宽度
+      this.millClientWidth = clientWidth - (this.nameWidth + 230); //毫秒容器的宽度（name列如果是动态计算的话用这个方法 ）留出30px的多余宽度
       let split = (this.dataList[0].duration / this.threshold); //根据步长this.threshold做拆分
       let splitCount = Math.floor(split / this.conversion) + 1; //  计算出需要分割几块，1000目的是对应上面的秒数; 拓展：+n 可以多出来一个预留宽度
       this.milliCounts = splitCount; // 需要循环的块数
