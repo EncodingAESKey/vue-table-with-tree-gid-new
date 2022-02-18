@@ -20,8 +20,8 @@ export const columns = [
   {
     label: "operationName",
     prop: "operationName",
-    // width: "300px",
     width: "300px",
+    // minWidth: "300px",
   },
   {
     label: "serviceName",

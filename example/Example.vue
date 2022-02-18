@@ -51,6 +51,9 @@
         :expand-type="config.expandType"
         :selection-type="config.selectionType"
       >
+        <template slot="operation" slot-scope="scope">
+          <div>{{scope.row.operationName}} - s</div>
+        </template>
         <template slot="millisecond" slot-scope="scope">
           <!-- 占位 做竖线 -->
           <div class="templListBox">
@@ -113,6 +116,7 @@ export default {
       fillColor: ["#a180c5", "#d28261", "#FF6A6A", "#6b9acf"],
       allServiceNameList: [], //获取所有的 serviceName
       assembleColor: {}, //组装颜色值
+      traceRootStartTime: 0, // 记录跟节点时间-做运算
     };
   },
   mounted() {
@@ -122,6 +126,8 @@ export default {
       // let element = document.getElementsByClassName('zk-table__body-row')[0];
       // if (element) this.nameWidth = element[element.firstElementChild ? 'firstElementChild' : 'firstChild'].clientWidth || 0;  // 动态设置name列的宽度
       /************ end 动态计算name宽度 ***********/
+
+      // 注意：请求成功之后拿到数据再走下面计算
       this.setThreshold();
       this.onWindowBound();
     });
@@ -130,6 +136,7 @@ export default {
     // 解析接口数据
     handleServiceData(spanDTO) {
       if (!spanDTO) return;
+      this.traceRootStartTime = spanDTO.startTime;
       let formatRes = this.formatDeptsData([spanDTO]);
       this.dataList = formatRes;
     },
@@ -140,7 +147,7 @@ export default {
         this.setServicesNameBgColor(element);
         return {
           ...others,
-          startTime: ((element['startTime'] - traceData[0].startTime) / 1000), // 转换成毫秒 跟节点既开始时间，微秒数最小
+          startTime: ((element['startTime'] - this.traceRootStartTime) / 1000), // 转换成毫秒 跟节点既开始时间，微秒数最小
           duration: (element['duration'] / 1000),
           children: element.children && element.children.length ? this.formatDeptsData(element.children) : null,
           bgColor: this.assembleColor[element.serviceName]
