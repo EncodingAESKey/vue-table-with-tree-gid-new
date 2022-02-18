@@ -21,8 +21,8 @@
             :key="'mill_list_' + index"
           >
           <!-- index + 1 !== milliCounts: 隐藏最后一项秒数，做根节点最长秒数显示  减24解释：-12px和对齐中间位置给了12px-->
-            <span v-if="(milliCounts === 1)">0 {{conversion === 1 ? 'ms' : 's'}}</span>
-            <span v-if="(index + 1 !== milliCounts)">{{ index ? (index * threshold).toFixed(1) : 0 }} {{conversion === 1 ? 'ms' : 's'}}</span>
+            <span v-if="(milliCounts === 1)">0 s</span>
+            <span v-if="(index + 1 !== milliCounts)">{{ index ? (index * threshold).toFixed(1) : 0 }} s</span>
             <span 
                 v-if="(index + 1 === milliCounts)"
                 :style="{
@@ -30,7 +30,7 @@
                   right: `${(getLastMillPosition())}px`,
                   width: 'fit-content'
                 }"
-            >{{ dataList.length ? handleDecimalPoint(dataList[0].duration / conversion, true) : 0 }} {{conversion === 1 ? 'ms' : 's'}}</span>
+            >{{ dataList.length ? handleDecimalPoint(dataList[0].duration / 1000, true) : 0 }} s</span>
           </li>
         </div>
       </div>
@@ -84,7 +84,7 @@
                   left: `${getDurationBound(scope) >= 200 ? 10 : getDurationBound(scope, 5)}px`,
                 }"
               >
-                {{ getMillSpecificData(scope) }}{{conversion === 1 ? 'ms' : 's'}}
+                {{ getMillSpecificData(scope) }}ms
               </span>
             </span>
           </div>
@@ -117,7 +117,6 @@ export default {
       allServiceNameList: [], //获取所有的 serviceName
       assembleColor: {}, //组装颜色值
       traceRootStartTime: 0, // 记录跟节点时间-做运算
-      conversion: 1, // 1000-时间按照秒来计算   1-时间按照毫秒来计算
     };
   },
   mounted() {
@@ -166,7 +165,7 @@ export default {
     // 根据根节点duration设置步长阈值
     setThreshold() {
       if (!this.dataList.length) return; 
-      this.threshold = Math.round(this.dataList[0].duration / this.conversion) / 10;  //1000ms-0.1的步长  2000ms-0.2的步长  3000ms-0.3的步长
+      this.threshold = Math.round(this.dataList[0].duration / 1000) / 10;  //1000ms-0.1的步长  2000ms-0.2的步长  3000ms-0.3的步长
       if (this.threshold <= 0) this.threshold = 0.1;
     },
     /**
@@ -179,9 +178,9 @@ export default {
       if (!this.dataList.length) return; 
       let clientWidth = document.body.clientWidth;
       // this.millClientWidth = clientWidth - this.$refs.apiNameRef.clientWidth; //毫秒容器的宽度（name列固定300用这个方法）
-      this.millClientWidth = clientWidth - (this.nameWidth + 210); //毫秒容器的宽度（name列如果是动态计算的话用这个方法 ）留出10px的多余宽度
+      this.millClientWidth = clientWidth - (this.nameWidth + 200); //毫秒容器的宽度（name列如果是动态计算的话用这个方法 ）
       let split = (this.dataList[0].duration / this.threshold); //根据步长this.threshold做拆分
-      let splitCount = Math.floor(split / this.conversion) + 1; //  计算出需要分割几块，1000目的是对应上面的秒数; 拓展：+n 可以多出来一个预留宽度
+      let splitCount = Math.floor(split / 1000) + 1; //  计算出需要分割几块，1000目的是对应上面的秒数; 拓展：+n 可以多出来一个预留宽度
       this.milliCounts = splitCount; // 需要循环的块数
       this.millItemWidth = this.millClientWidth / splitCount; // 计算每一块儿的宽度
       console.log("拆分数量:", splitCount, "每一块宽度:", this.millItemWidth, this.millClientWidth);
@@ -190,13 +189,13 @@ export default {
     setStartTimeLeftSpace(scope) {
       if (!this.millItemWidth) return;
       let startTime = scope.row.startTime;
-      return startTime ? ((startTime / this.threshold) / this.conversion) * this.millItemWidth : 0; // 开始时间设置为阈值对应1/2的位置
+      return startTime ? ((startTime / this.threshold) / 1000) * this.millItemWidth : 0; // 开始时间设置为阈值对应1/2的位置
     },
     // 计算最后一个秒数的位置
     getLastMillPosition() {
       if (!this.millItemWidth || !this.dataList.length) return;
       let spaceMiddle = 24; //微调对齐细节
-      let lastLeft = this.millClientWidth - (((this.dataList[0].duration / this.threshold) / this.conversion) * this.millItemWidth);
+      let lastLeft = this.millClientWidth - (((this.dataList[0].duration / this.threshold) / 1000) * this.millItemWidth);
       // if (this.milliCounts === 1) spaceMiddle = 36;  // 0.0几 秒的情况偏移36
       // 小于20说明最后一个秒数顶到头了，向左偏移固定px即可(处理样式问题)
       if (lastLeft.toFixed(2) == this.millItemWidth) {
@@ -221,7 +220,7 @@ export default {
      */
     getDurationBound(scope, extend = 0) {
       if (!this.millItemWidth) return;
-      let bound = Math.abs(((scope.row.duration) / this.threshold) / this.conversion) * this.millItemWidth;
+      let bound = Math.abs(((scope.row.duration) / this.threshold) / 1000) * this.millItemWidth;
       if (typeof bound === "number") {
         let newBound = this.handleDecimalPoint(bound);
         return newBound + extend;
